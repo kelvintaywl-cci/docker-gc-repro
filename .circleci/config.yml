@@ -43,14 +43,19 @@ commands:
             - run:
                 name: spin docker-gc container
                 command: |
-                  docker run --rm --name docker-gc --privileged --net=host --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
+                  docker run --detach --rm --name docker-gc --privileged --net=host --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
       - unless:
           condition: << parameters.use-host-net >>
           steps:
             - run:
                 name: spin docker-gc container without net=host 
                 command: |
-                  docker run --rm --name docker-gc --privileged --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
+                  docker run --detach --rm --name docker-gc --privileged --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
+      - run:
+          name: close out after 10s
+          command: |
+            sleep 10
+            circleci-agent step halt
 
 jobs:
   # based on
