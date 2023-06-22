@@ -37,23 +37,20 @@ commands:
           name: set up Docker volume
           command: |
             docker volume create docker-gc --label=keep
-      - run:
-          name: spin docker-gc container
-          command: |
-            docker run \
-              --rm \
-              --interactive \
-              --name "docker-gc" \
-              --privileged \
-              <<#parameters.use-host-net>> --net=host \ <</parameters.use-host-net>>
-              --userns=host \
-              --volume /var/run/docker.sock:/var/run/docker.sock \
-              --volume /var/lib/docker:/var/lib/docker:ro \
-              --volume docker-gc:/state \
-              --network=ci-privileged \
-              --network-alias=docker-gc.internal.circleci.com \
-              "circleci/docker-gc:2.0" \
-              -threshold-percent 50
+      - when:
+          condition: << parameters.use-host-net >>
+          steps:
+            - run:
+                name: spin docker-gc container
+                command: |
+                  docker run --rm --name docker-gc --privileged --net=host --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
+      - unless:
+          condition: << parameters.use-host-net >>
+          steps:
+            - run:
+                name: spin docker-gc container without net=host 
+                command: |
+                  docker run --rm --name docker-gc --privileged --userns=host --volume /var/run/docker.sock:/var/run/docker.sock --volume /var/lib/docker:/var/lib/docker:ro --volume docker-gc:/state --network=ci-privileged --network-alias=docker-gc.internal.circleci.com circleci/docker-gc:2.0 -threshold-percent 50
 
 jobs:
   # based on
