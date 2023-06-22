@@ -1,0 +1,82 @@
+version: 2.1
+
+executors:
+  ubuntu2004:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    resource_class: medium
+
+commands:
+  inspect:
+    steps:
+      - run: docker version
+  setup-docker-network:
+    steps:
+      - run:
+          name: create ci-privileged Docker network
+          command: |
+            docker network create --label keep --driver=bridge --opt com.docker.network.bridge.name=ci-privileged ci-privileged
+            docker network ls
+  spin-up-docker-gc:
+    parameters:
+      use-host-net:
+        type: boolean
+        default: true
+    steps:
+      - run:
+          name: Inspect containers running (background)
+          command: |
+            while true; do
+              sleep 2
+              printf "\n\n$(date)\n"
+              docker ps
+              echo "======"
+            done
+          background: true
+      - run:
+          name: set up Docker volume
+          command: |
+            docker volume create docker-gc --label=keep
+      - run:
+          name: spin docker-gc container
+          command: |
+            docker run \
+              --rm \
+              --interactive \
+              --name "docker-gc" \
+              --privileged \
+              <<#parameters.use-host-net>> --net=host \ <</parameters.use-host-net>>
+              --userns=host \
+              --volume /var/run/docker.sock:/var/run/docker.sock \
+              --volume /var/lib/docker:/var/lib/docker:ro \
+              --volume docker-gc:/state \
+              --network=ci-privileged \
+              --network-alias=docker-gc.internal.circleci.com \
+              "circleci/docker-gc:2.0" \
+              -threshold-percent 50
+
+jobs:
+  # based on
+  # https://github.com/CircleCI-Public/server-terraform/blob/main/nomad-aws/template/nomad-startup.sh.tpl
+  docker_gc:
+    parameters:
+      use-host-net:
+        type: boolean
+        default: true
+    executor: ubuntu2004
+    steps:
+      - inspect
+      - setup-docker-network
+      - spin-up-docker-gc:
+          use-host-net: << parameters.use-host-net >>
+
+
+workflows:
+  repro:
+    jobs:
+      - docker_gc:
+          use-host-net: false
+          name: fixed
+      - docker_gc:
+          use-host-net: true
+          name: error_reproduced
